@@ -8,18 +8,22 @@ datasource db {
 }
 
 model lead {
-  id             Int      @id @default(autoincrement())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  firstName      String
-  lastName       String
-  email          String
-  jobTitle       String?
-  countryCode    String?
-  companyName    String?
-  message        String?
-  emailVerified  Boolean?
-  phoneNumber    String?
-  yearsAtCompany Int?
-  linkedinUrl    String?
+  id                      Int      @id @default(autoincrement())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  firstName               String
+  lastName                String
+  email                   String
+  jobTitle                String?
+  countryCode             String?
+  companyName             String?
+  message                 String?
+  emailVerified           Boolean?
+  phoneNumber             String?
+  yearsAtCompany          Int?
+  linkedinUrl             String?
+  // Progress of the phone enrichment workflow: IN_PROGRESS | FOUND | NOT_FOUND | FAILED
+  phoneEnrichmentStatus   String?
+  // Provider currently queried while IN_PROGRESS, or the one that found the phone
+  phoneEnrichmentProvider String?
 }

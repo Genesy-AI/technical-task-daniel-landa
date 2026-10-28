@@ -1,10 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FC, useState } from 'react'
 import toast from 'react-hot-toast'
-import { IconBrandLinkedin } from '@tabler/icons-react'
+import { IconBrandLinkedin, IconLoader2, IconPhone } from '@tabler/icons-react'
 import { api } from '../api'
+import { usePhoneEnrichment } from '../hooks/usePhoneEnrichment'
+import { isEnrichingPhone } from '../utils/phoneEnrichment'
 import { MessageTemplateModal } from './MessageTemplateModal'
 import { CsvImportModal } from './CsvImportModal'
+import { PhoneCell } from './PhoneCell'
+
+const PHONE_ENRICHMENT_POLL_INTERVAL_MS = 2000
 
 export const LeadsList: FC = () => {
   const [selectedLeads, setSelectedLeads] = useState<number[]>([])
@@ -17,7 +22,11 @@ export const LeadsList: FC = () => {
     queryKey: ['leads', 'getMany'],
     queryFn: async () => api.leads.getMany(),
     retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.some(isEnrichingPhone) ? PHONE_ENRICHMENT_POLL_INTERVAL_MS : false,
   })
+
+  const phoneEnrichment = usePhoneEnrichment(leads.data)
   
 
   const deleteLeadsMutation = useMutation({
@@ -100,6 +109,16 @@ export const LeadsList: FC = () => {
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">Leads</h2>
           <div className="flex items-center gap-3">
+            {phoneEnrichment.progress && (
+              <span
+                role="status"
+                className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-2 py-1 rounded-md font-medium text-sm"
+              >
+                <IconLoader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                Finding phones {phoneEnrichment.progress.done}/{phoneEnrichment.progress.total}
+              </span>
+            )}
+
             {selectedLeads.length > 0 && (
               <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md font-medium text-sm">
                 {selectedLeads.length} selected
@@ -157,6 +176,19 @@ export const LeadsList: FC = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12H8m8 0a8 8 0 11-16 0 8 8 0 0116 0zm-8 0V4" />
                         </svg>
                         Verify Email
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        phoneEnrichment.enrichPhones(selectedLeads)
+                        setIsEnrichDropdownOpen(false)
+                      }}
+                      disabled={phoneEnrichment.isStarting}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <div className="flex items-center">
+                        <IconPhone className="mr-3 h-4 w-4" aria-hidden="true" />
+                        Find Phone
                       </div>
                     </button>
                     <button
@@ -286,18 +318,7 @@ export const LeadsList: FC = () => {
                     <div className="text-sm text-gray-900">{lead.countryCode || '-'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {lead.phoneNumber ? (
-                        <a
-                          href={`tel:${lead.phoneNumber}`}
-                          className="hover:text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
-                        >
-                          {lead.phoneNumber}
-                        </a>
-                      ) : (
-                        '-'
-                      )}
-                    </div>
+                    <PhoneCell lead={lead} />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{lead.yearsAtCompany ?? '-'}</div>

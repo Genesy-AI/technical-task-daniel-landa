@@ -1,4 +1,3 @@
-import { PrismaClient } from '@prisma/client'
 import express, { Request, Response } from 'express'
 import { Connection, Client } from '@temporalio/client'
 import { verifyEmailWorkflow } from './workflows'
@@ -10,8 +9,9 @@ import {
   isValidOptionalYearsAtCompany,
   normalizeLinkedinUrl,
 } from './utils/leadFields'
+import { startPhoneEnrichment } from './phoneEnrichment/startPhoneEnrichment'
 import { runTemporalWorker } from './worker'
-const prisma = new PrismaClient()
+import { prisma } from './db'
 const app = express()
 app.use(express.json())
 
@@ -325,6 +325,62 @@ app.post('/leads/verify-emails', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error verifying emails:', error)
     res.status(500).json({ error: 'Failed to verify emails' })
+  }
+})
+
+app.post('/leads/enrich-phones', async (req: Request, res: Response) => {
+  if (!req.body || typeof req.body !== 'object') {
+    return res.status(400).json({ error: 'Request body is required and must be valid JSON' })
+  }
+
+  const { leadIds } = req.body as { leadIds?: number[] }
+
+  if (!Array.isArray(leadIds) || leadIds.length === 0) {
+    return res.status(400).json({ error: 'leadIds must be a non-empty array' })
+  }
+
+  try {
+    const leads = await prisma.lead.findMany({
+      where: { id: { in: leadIds.map((id) => Number(id)) } },
+    })
+
+    if (leads.length === 0) {
+      return res.status(404).json({ error: 'No leads found with the provided IDs' })
+    }
+
+    const connection = await Connection.connect({ address: 'localhost:7233' })
+    const client = new Client({ connection, namespace: 'default' })
+
+    const startedLeadIds: number[] = []
+    const skipped: Array<{ leadId: number; leadName: string; reason: string }> = []
+    const errors: Array<{ leadId: number; leadName: string; error: string }> = []
+
+    try {
+      for (const lead of leads) {
+        const leadName = `${lead.firstName} ${lead.lastName}`.trim()
+        try {
+          const result = await startPhoneEnrichment(client.workflow, lead)
+          if (result.started) {
+            startedLeadIds.push(lead.id)
+          } else {
+            skipped.push({ leadId: lead.id, leadName, reason: result.reason })
+          }
+        } catch (error) {
+          errors.push({
+            leadId: lead.id,
+            leadName,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          })
+        }
+      }
+    } finally {
+      await connection.close()
+    }
+
+    res.json({ success: true, startedLeadIds, skipped, errors })
+  } catch (error) {
+    console.error('Error enriching phones:', error)
+    res.status(500).json({ error: 'Failed to start phone enrichment' })
   }
 })
 
