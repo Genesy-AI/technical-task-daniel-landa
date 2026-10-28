@@ -247,4 +247,71 @@ Jane,Johnson,jane@example.com`
     expect(result[0].email).toBe('john@example.com')
     expect(result[0].isValid).toBe(true)
   })
+
+  describe('phone number, years at company and LinkedIn URL', () => {
+    it('should parse the new fields', () => {
+      const csv = `firstName,lastName,email,phoneNumber,yearsAtCompany,linkedinUrl
+John,Doe,john@example.com,+1-280-754-0462x2154,5,https://www.linkedin.com/in/john-doe`
+
+      const result = parseCsv(csv)
+
+      expect(result[0]).toMatchObject({
+        phoneNumber: '+1-280-754-0462x2154',
+        yearsAtCompany: 5,
+        linkedinUrl: 'https://www.linkedin.com/in/john-doe',
+        isValid: true,
+      })
+    })
+
+    it('should accept the yearsInRole header used in the sample CSV files', () => {
+      const csv = `firstName,lastName,email,yearsInRole,phoneNumber
+Chad,Smith,chad@example.com,2,001-464-312-8555`
+
+      const result = parseCsv(csv)
+
+      expect(result[0].yearsAtCompany).toBe(2)
+      expect(result[0].phoneNumber).toBe('001-464-312-8555')
+      expect(result[0].isValid).toBe(true)
+    })
+
+    it('should keep zero years at company', () => {
+      const csv = `firstName,lastName,email,yearsAtCompany
+John,Doe,john@example.com,0`
+
+      expect(parseCsv(csv)[0].yearsAtCompany).toBe(0)
+    })
+
+    it('should add https to LinkedIn URLs without protocol', () => {
+      const csv = `firstName,lastName,email,linkedinUrl
+John,Doe,john@example.com,linkedin.com/in/john-doe`
+
+      expect(parseCsv(csv)[0].linkedinUrl).toBe('https://linkedin.com/in/john-doe')
+    })
+
+    it('should leave the new fields undefined when empty or missing', () => {
+      const csv = `firstName,lastName,email,phoneNumber,yearsAtCompany
+John,Doe,john@example.com,,`
+
+      const result = parseCsv(csv)
+
+      expect(result[0].phoneNumber).toBeUndefined()
+      expect(result[0].yearsAtCompany).toBeUndefined()
+      expect(result[0].linkedinUrl).toBeUndefined()
+      expect(result[0].isValid).toBe(true)
+    })
+
+    it('should mark rows with invalid new fields as invalid', () => {
+      const csv = `firstName,lastName,email,phoneNumber,yearsAtCompany,linkedinUrl
+John,Doe,john@example.com,call me,-3,https://example.com/john`
+
+      const result = parseCsv(csv)
+
+      expect(result[0].isValid).toBe(false)
+      expect(result[0].errors).toEqual([
+        'Invalid phone number "call me"',
+        'Invalid years at company "-3" (expected a whole number between 0 and 100)',
+        'Invalid LinkedIn URL "https://example.com/john" (expected a linkedin.com URL)',
+      ])
+    })
+  })
 })

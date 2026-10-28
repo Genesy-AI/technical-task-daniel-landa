@@ -1,5 +1,11 @@
 import Papa from 'papaparse'
 import { isValidCountryCode, normalizeCountryCode } from './countryCode'
+import {
+  isValidLinkedinUrl,
+  isValidPhoneNumber,
+  normalizeLinkedinUrl,
+  parseYearsAtCompany,
+} from './leadFields'
 
 export interface CsvLead {
   firstName: string
@@ -8,6 +14,9 @@ export interface CsvLead {
   jobTitle?: string
   countryCode?: string
   companyName?: string
+  phoneNumber?: string
+  yearsAtCompany?: number
+  linkedinUrl?: string
   isValid: boolean
   errors: string[]
   rowIndex: number
@@ -50,6 +59,7 @@ export const parseCsv = (content: string): CsvLead[] => {
     if (Object.values(row).every((value) => !value)) return
 
     const lead: Partial<CsvLead> = { rowIndex: index + 2 }
+    let rawYearsAtCompany = ''
 
     Object.entries(row).forEach(([header, value]) => {
       const normalizedHeader = header.toLowerCase().replace(/[^a-z]/g, '')
@@ -74,6 +84,19 @@ export const parseCsv = (content: string): CsvLead[] => {
         case 'companyname':
           lead.companyName = trimmedValue || undefined
           break
+        case 'phonenumber':
+        case 'phone':
+          lead.phoneNumber = trimmedValue || undefined
+          break
+        case 'yearsatcompany':
+        case 'yearsinrole':
+          rawYearsAtCompany = trimmedValue
+          lead.yearsAtCompany = parseYearsAtCompany(trimmedValue) ?? undefined
+          break
+        case 'linkedinurl':
+        case 'linkedin':
+          lead.linkedinUrl = trimmedValue ? normalizeLinkedinUrl(trimmedValue) : undefined
+          break
       }
     })
 
@@ -91,6 +114,17 @@ export const parseCsv = (content: string): CsvLead[] => {
     }
     if (lead.countryCode && !isValidCountryCode(lead.countryCode)) {
       errors.push(`Invalid country code "${lead.countryCode}" (expected ISO 3166-1 alpha-2, e.g. ES)`)
+    }
+    if (lead.phoneNumber && !isValidPhoneNumber(lead.phoneNumber)) {
+      errors.push(`Invalid phone number "${lead.phoneNumber}"`)
+    }
+    if (rawYearsAtCompany && lead.yearsAtCompany === undefined) {
+      errors.push(
+        `Invalid years at company "${rawYearsAtCompany}" (expected a whole number between 0 and 100)`
+      )
+    }
+    if (lead.linkedinUrl && !isValidLinkedinUrl(lead.linkedinUrl)) {
+      errors.push(`Invalid LinkedIn URL "${lead.linkedinUrl}" (expected a linkedin.com URL)`)
     }
 
     data.push({

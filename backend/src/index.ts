@@ -4,6 +4,12 @@ import { Connection, Client } from '@temporalio/client'
 import { verifyEmailWorkflow } from './workflows'
 import { generateMessageFromTemplate } from './utils/messageGenerator'
 import { isValidOptionalCountryCode, normalizeCountryCode } from './utils/countryCode'
+import {
+  isValidOptionalLinkedinUrl,
+  isValidOptionalPhoneNumber,
+  isValidOptionalYearsAtCompany,
+  normalizeLinkedinUrl,
+} from './utils/leadFields'
 import { runTemporalWorker } from './worker'
 const prisma = new PrismaClient()
 const app = express()
@@ -191,14 +197,17 @@ app.post('/leads/bulk', async (req: Request, res: Response) => {
         lead.lastName.trim() &&
         typeof lead.email === 'string' &&
         lead.email.trim() &&
-        isValidOptionalCountryCode(lead.countryCode)
+        isValidOptionalCountryCode(lead.countryCode) &&
+        isValidOptionalPhoneNumber(lead.phoneNumber) &&
+        isValidOptionalYearsAtCompany(lead.yearsAtCompany) &&
+        isValidOptionalLinkedinUrl(lead.linkedinUrl)
       )
     })
 
     if (validLeads.length === 0) {
       return res.status(400).json({
         error:
-          'No valid leads found. firstName, lastName, and email are required, and countryCode must be a valid ISO 3166-1 alpha-2 code.',
+          'No valid leads found. firstName, lastName, and email are required, countryCode must be a valid ISO 3166-1 alpha-2 code, phoneNumber must be a valid phone number, yearsAtCompany must be a whole number between 0 and 100, and linkedinUrl must be a LinkedIn URL.',
       })
     }
 
@@ -232,6 +241,9 @@ app.post('/leads/bulk', async (req: Request, res: Response) => {
             jobTitle: lead.jobTitle ? lead.jobTitle.trim() : null,
             countryCode: lead.countryCode?.trim() ? normalizeCountryCode(lead.countryCode) : null,
             companyName: lead.companyName ? lead.companyName.trim() : null,
+            phoneNumber: lead.phoneNumber?.trim() || null,
+            yearsAtCompany: lead.yearsAtCompany ?? null,
+            linkedinUrl: lead.linkedinUrl?.trim() ? normalizeLinkedinUrl(lead.linkedinUrl) : null,
           },
         })
         importedCount++
