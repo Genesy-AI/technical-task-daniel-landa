@@ -37,6 +37,7 @@ Before considering a change done, run tests, lint/type-check (`build`), and form
 - Handle errors explicitly and give the user meaningful feedback; never swallow errors silently.
 - Don't add speculative abstractions or features that weren't requested.
 - Prisma schema changes always go with a migration (`pnpm migrate:dev`) — never edit existing migrations.
+- **Bug fixes must be minimal.** Change only what is needed to fix the reported bug. Suggest any further improvements in your summary, but do not apply them.
 
 ## Testing
 
