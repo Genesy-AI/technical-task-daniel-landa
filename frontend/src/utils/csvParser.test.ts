@@ -154,6 +154,30 @@ John,Doe,john@example.com,,`
     expect(result[0].isValid).toBe(true)
   })
 
+  it('should mark rows with invalid country codes as invalid', () => {
+    const csv = `firstName,lastName,email,countryCode
+Linda,Choi,linda@example.com,XXX
+Amanda,James,amanda@example.com,12
+Zed,Zulu,zed@example.com,ZZ`
+
+    const result = parseCsv(csv)
+
+    expect(result.map((lead) => lead.isValid)).toEqual([false, false, false])
+    expect(result[0].errors).toEqual(['Invalid country code "XXX" (expected ISO 3166-1 alpha-2, e.g. ES)'])
+    expect(result[1].errors).toEqual(['Invalid country code "12" (expected ISO 3166-1 alpha-2, e.g. ES)'])
+    expect(result[2].errors).toEqual(['Invalid country code "ZZ" (expected ISO 3166-1 alpha-2, e.g. ES)'])
+  })
+
+  it('should normalize valid country codes to uppercase', () => {
+    const csv = `firstName,lastName,email,countryCode
+John,Doe,john@example.com,es`
+
+    const result = parseCsv(csv)
+
+    expect(result[0].countryCode).toBe('ES')
+    expect(result[0].isValid).toBe(true)
+  })
+
   it('should preserve row index correctly', () => {
     const csv = `firstName,lastName,email
 John,Doe,john@example.com
